@@ -1,0 +1,39 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'ru.vzotov'
+version '1.0-SNAPSHOT'
+
+mainClassName = 'ru.vzotov.jqpdf.MainPdf'
+
+application {
+    applicationDefaultJvmArgs = ["-Djava.library.path=" + project(':jqpdflib').buildDir.absolutePath +  "/lib/main/debug/shared"]
+}
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.0'
+
+    implementation 'com.google.zxing:core:3.4.1'
+    implementation 'com.google.zxing:javase:3.4.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}

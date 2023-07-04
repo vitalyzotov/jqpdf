@@ -1,0 +1,4 @@
+rootProject.name = 'jqpdf'
+include 'jqpdflib'
+include 'jqpdf-jni'
+

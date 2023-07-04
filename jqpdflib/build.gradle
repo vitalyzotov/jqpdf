@@ -1,0 +1,40 @@
+import org.gradle.internal.os.OperatingSystem
+import org.gradle.internal.jvm.Jvm
+
+plugins {
+    id 'cpp-library'
+}
+
+group 'ru.vzotov'
+
+def jvmHome = Jvm.current().javaHome
+def libIncludePath = file('../qpdf-11.4.0-msvc64/include')
+def libReleaseLib = file(OperatingSystem.current().getSharedLibraryName('../qpdf-11.4.0-msvc64/lib/qpdf_static'))
+def libReleaseLinkLib = file(OperatingSystem.current().getLinkLibraryName('../qpdf-11.4.0-msvc64/lib/qpdf'))
+
+library {
+    linkage = [Linkage.STATIC, Linkage.SHARED]
+
+    binaries.configureEach {
+        def compileTask = compileTask.get()
+        if (toolChain instanceof VisualCpp) {
+            compileTask.compilerArgs.add "/std:c++17"
+        }
+        if (targetMachine.operatingSystemFamily.windows) {
+            compileTask.compilerArgs.addAll "-I${jvmHome}/include", "-I${jvmHome}/include/win32"
+        } else if(targetMachine.operatingSystemFamily.linux) {
+            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include", '-I', "${jvmHome}/include/linux", '-D_FILE_OFFSET_BITS=64'
+        } else if(targetMachine.operatingSystemFamily.macOs) {
+            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include", '-I', "${jvmHome}/include/darwin", '-mmacosx-version-min=10.4'
+        }
+    }
+}
+
+components.main.binaries.whenElementFinalized { binary ->
+    project.dependencies {
+
+        add(binary.includePathConfiguration.name, files(libIncludePath))
+        add(binary.linkLibraries.name, files(libReleaseLinkLib))
+        add(binary.runtimeLibraries.name, files(libReleaseLib))
+    }
+}
