@@ -142,8 +142,15 @@ public class MainPdf {
     }
 
     public static void main(String... args) throws IOException {
+        if(args.length < 1) {
+            System.out.println("Input pdf file required");
+            System.exit(1);
+        }
+
+        final String inputFile = args[0];
+
         final JQPDF jqpdf = new JQPDF();
-        final byte[] bytes = Files.readAllBytes(Path.of("d:\\projects\\accounting2\\ozon\\output.pdf"));
+        final byte[] bytes = Files.readAllBytes(Path.of(args[0]));
         final StringBuilder builder = new StringBuilder();
         jqpdf.pdfToJson(bytes, (data) -> {
             final String s = new String(data, StandardCharsets.US_ASCII);

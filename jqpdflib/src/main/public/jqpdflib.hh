@@ -3,8 +3,6 @@
 #ifndef _Included_ru_vzotov_jqpdf_JQPDF
 #define _Included_ru_vzotov_jqpdf_JQPDF
 
-#define POINTERHOLDER_TRANSITION 4
-
 #ifdef __cplusplus
 extern "C" {
 #endif

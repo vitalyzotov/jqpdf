@@ -2,37 +2,68 @@ import org.gradle.internal.os.OperatingSystem
 import org.gradle.internal.jvm.Jvm
 
 plugins {
+    id "de.undercouch.download" version "5.4.0"
     id 'cpp-library'
 }
 
 group 'ru.vzotov'
 
+def qpdfVersion = '11.4.0'
+def qpdfBasename = "qpdf-${qpdfVersion}-msvc64"
 def jvmHome = Jvm.current().javaHome
-def libIncludePath = file('../qpdf-11.4.0-msvc64/include')
-def libReleaseLib = file(OperatingSystem.current().getSharedLibraryName('../qpdf-11.4.0-msvc64/lib/qpdf_static'))
-def libReleaseLinkLib = file(OperatingSystem.current().getLinkLibraryName('../qpdf-11.4.0-msvc64/lib/qpdf'))
+def libIncludePath = file("${qpdfBasename}/include")
+def libReleaseLib = file(OperatingSystem.current().getSharedLibraryName("${qpdfBasename}/lib/qpdf_static"))
+def libReleaseLinkLib = file(OperatingSystem.current().getLinkLibraryName("${qpdfBasename}/lib/qpdf"))
+
+task downloadQPDFZip(type: Download) {
+    src "https://github.com/qpdf/qpdf/releases/download/v${qpdfVersion}/${qpdfBasename}.zip"
+    dest file("${qpdfBasename}.zip")
+    onlyIf { !dest.exists() }
+}
+
+task downloadAndUnzipQPDF(dependsOn: downloadQPDFZip, type: Copy) {
+    from zipTree(downloadQPDFZip.dest)
+    into layout.projectDirectory.dir('.')
+    onlyIf { !libIncludePath.exists() }
+}
+
+
+tasks.withType(CppCompile).configureEach {
+    macros.put("POINTERHOLDER_TRANSITION", "4")
+
+    compilerArgs.addAll toolChain.map { toolChain ->
+        if (toolChain in VisualCpp) {
+            return ['/std:c++17']
+        }
+        return []
+    }
+
+}
 
 library {
     linkage = [Linkage.STATIC, Linkage.SHARED]
 
     binaries.configureEach {
         def compileTask = compileTask.get()
-        if (toolChain instanceof VisualCpp) {
-            compileTask.compilerArgs.add "/std:c++17"
-        }
+
         if (targetMachine.operatingSystemFamily.windows) {
-            compileTask.compilerArgs.addAll "-I${jvmHome}/include", "-I${jvmHome}/include/win32"
+            compileTask.compilerArgs.addAll "-I${jvmHome}/include"
+            compileTask.compilerArgs.addAll "-I${jvmHome}/include/win32"
         } else if(targetMachine.operatingSystemFamily.linux) {
-            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include", '-I', "${jvmHome}/include/linux", '-D_FILE_OFFSET_BITS=64'
+            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include"
+            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include/linux"
+            compileTask.compilerArgs.addAll '-D_FILE_OFFSET_BITS=64'
         } else if(targetMachine.operatingSystemFamily.macOs) {
-            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include", '-I', "${jvmHome}/include/darwin", '-mmacosx-version-min=10.4'
+            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include"
+            compileTask.compilerArgs.addAll '-I', "${jvmHome}/include/darwin"
+            compileTask.compilerArgs.addAll '-mmacosx-version-min=10.4'
         }
+        compileTask.dependsOn(downloadAndUnzipQPDF)
     }
 }
 
 components.main.binaries.whenElementFinalized { binary ->
     project.dependencies {
-
         add(binary.includePathConfiguration.name, files(libIncludePath))
         add(binary.linkLibraries.name, files(libReleaseLinkLib))
         add(binary.runtimeLibraries.name, files(libReleaseLib))
