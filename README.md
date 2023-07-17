@@ -9,9 +9,9 @@ Publish libraries to Maven repository
 Run application
 
 ```bash
-./gradlew -p jqpdf-jni run --info --args="$(pwd)/test1.pdf"
+./gradlew -p jqpdf-jni readQrCodeFromPdf --info --args="$(pwd)/test1.pdf"
 ```
 
 ```commandline
-gradlew -p jqpdf-jni run --info --args="%cd%\test1.pdf"
+gradlew -p jqpdf-jni readQrCodeFromPdf --info --args="%cd%\test1.pdf"
 ```

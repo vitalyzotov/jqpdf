@@ -7,7 +7,6 @@ import com.google.zxing.FormatException;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.Result;
-import com.google.zxing.common.BitArray;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.common.BitSource;
 import com.google.zxing.common.HybridBinarizer;
