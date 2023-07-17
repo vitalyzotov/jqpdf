@@ -69,7 +69,7 @@ java {
     }
 }
 
-task readQrCodeFromPdf(type: JavaExec) {
+tasks.register('readQrCodeFromPdf', JavaExec) {
     group = "Execution"
     description = "Run MainPdf example"
     classpath = sourceSets.examples.runtimeClasspath
