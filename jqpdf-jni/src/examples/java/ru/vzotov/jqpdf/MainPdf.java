@@ -7,15 +7,17 @@ import com.google.zxing.FormatException;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.Result;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.common.BitSource;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeReader;
+import ru.vzotov.jqpdf.domain.ColorSpace;
+import ru.vzotov.jqpdf.domain.RefOrName;
+import ru.vzotov.jqpdf.domain.SampleModel;
 import ru.vzotov.jqpdf.model.PdfObject;
 import ru.vzotov.jqpdf.model.PdfStream;
 import ru.vzotov.jqpdf.model.QPdfJson2;
 import ru.vzotov.jqpdf.model.QPdfObject;
 import ru.vzotov.jqpdf.model.QPdfObjects;
+import ru.vzotov.jqpdf.utils.Bits;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -28,24 +30,32 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 
 public class MainPdf {
 
-    static class DirectLuminanceSource extends LuminanceSource {
+    static class BitsLuminanceSource extends LuminanceSource {
+        private final Bits matrix;
+        private final SampleModel sampleModel;
 
-        private final BitMatrix matrix;
-
-        protected DirectLuminanceSource(BitMatrix matrix) {
-            super(matrix.getWidth(), matrix.getHeight());
+        protected BitsLuminanceSource(Bits matrix, int width, int height, SampleModel sampleModel) {
+            super(width, height);
             this.matrix = matrix;
+
+            this.sampleModel = sampleModel;
         }
 
         @Override
         public byte[] getRow(int y, byte[] row) {
-            int w = getWidth();
+            final int w = getWidth();
+            final int bitsPerSample = sampleModel.bitsPerSample();
+            final int dataPerRow = w * bitsPerSample;
+            final int bitsPerRow = dataPerRow + ((8 - dataPerRow % 8) & 7);
             row = row == null || row.length < w ? new byte[w] : row;
-            for (int i = 0; i < w; i++) {
-                row[i] = (matrix.get(i, y) ? 0 : (byte) 0xff);
+            for (int x = 0; x < w; x++) {
+                final int index = y * bitsPerRow + x * bitsPerSample;
+                final long data = matrix.get(index, index + bitsPerSample);
+                row[x] = (byte) sampleModel.getLuminance(data);
             }
             return row;
         }
@@ -55,84 +65,70 @@ public class MainPdf {
             int w = getWidth();
             int h = getHeight();
             byte[] result = new byte[w * h];
+
+            final int bitsPerSample = sampleModel.bitsPerSample();
+            final int dataPerRow = w * bitsPerSample;
+            final int bitsPerRow = dataPerRow + ((8 - dataPerRow % 8) & 7);
+
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
-                    result[y * w + x] = (matrix.get(x, y) ? 0 : (byte) 0xff);
+                    final int index = y * bitsPerRow + x * bitsPerSample;
+                    final long data = matrix.get(index, index + bitsPerSample);
+
+                    result[y * w + x] = (byte) sampleModel.getLuminance(data);
                 }
             }
             return result;
         }
     }
 
-    public static BufferedImage saveImage(BitMatrix byteMatrix) {
+    public static BufferedImage saveImage(LuminanceSource source) {
         // Make the BufferedImage that are to hold the QRCode
-        int matrixWidth = byteMatrix.getWidth();
-        BufferedImage image = new BufferedImage(matrixWidth, matrixWidth, BufferedImage.TYPE_INT_RGB);
+        int matrixWidth = source.getWidth();
+        int matrixHeight = source.getHeight();
+        BufferedImage image = new BufferedImage(matrixWidth, matrixHeight, BufferedImage.TYPE_INT_RGB);
         image.createGraphics();
 
         Graphics2D graphics = (Graphics2D) image.getGraphics();
         graphics.setColor(Color.WHITE);
-        graphics.fillRect(0, 0, matrixWidth, matrixWidth);
+        graphics.fillRect(0, 0, matrixWidth, matrixHeight);
         // Paint and save the image using the ByteMatrix
-        graphics.setColor(Color.BLACK);
 
-        for (int i = 0; i < matrixWidth; i++) {
-            for (int j = 0; j < matrixWidth; j++) {
-                if (byteMatrix.get(i, j)) {
-                    graphics.fillRect(i, j, 1, 1);
-                }
+
+        final byte[] matrix = source.getMatrix();
+        for (int x = 0; x < matrixWidth; x++) {
+            for (int y = 0; y < matrixHeight; y++) {
+                final int v = Byte.toUnsignedInt(matrix[y * matrixWidth + x]);
+                graphics.setColor(new Color(v, v, v));
+                graphics.fillRect(x, y, 1, 1);
             }
         }
         return image;
 
     }
 
-
-    public static void process(PdfStream stream) throws IOException {
+    public static void process(String key, PdfStream stream) throws IOException {
         int width = stream.width();
         int height = stream.height();
-        //final byte[] bytes = stream.data().getBytes(StandardCharsets.US_ASCII);
+
         final byte[] bytes = Base64.getDecoder().decode(stream.data());
-        System.out.println("data size = " + bytes.length);
-        System.out.println("w = " + width);
-        System.out.println("h = " + height);
-
-
-//        for (int i = 0; i < bytes.length; i++) {
-//            bytes[i] = (byte) (Integer.reverse(Byte.toUnsignedInt(bytes[i])) >> 24);
-//        }
-
-        BitSource source = new BitSource(bytes);
-        BitMatrix matrix = new BitMatrix(width, height);
-        for (int row = 0; row < height; row++) {
-            for(int col =0; col < width; col++) {
-                final int bits = source.readBits(1);
-                if((bits & 0x1) > 0) {
-                    matrix.unset(col, row);
-                } else {
-                    matrix.set(col, row);
-                }
-            }
-
-            int align = source.available() % 8;
-            if (align > 0) {
-                source.readBits(align);
-            }
-
-            //matrix.setRow(row, array);
+        final ColorSpace colorSpace = Optional.ofNullable(stream.colorSpace()).map(RefOrName::resolve).orElse(null);
+        if (colorSpace == null) {
+            System.out.println("Color space not supported");
+            return;
         }
 
-        ImageIO.write(saveImage(matrix), "png", Paths.get("out.png").toFile());
-
-        final DirectLuminanceSource ls = new DirectLuminanceSource(matrix);
+        final Bits source = Bits.valueOf(bytes);
+        final LuminanceSource ls = new BitsLuminanceSource(source, width, height, new SampleModel(colorSpace, stream.bitsPerComponent()));
         BinaryBitmap bmp = new BinaryBitmap(new HybridBinarizer(ls));
-
 
         try {
             Result result = new QRCodeReader().decode(bmp);
-            System.out.println(result.getText());
+            System.out.println(key + "::" + result.getText());
+            ImageIO.write(saveImage(ls), "png", Paths.get(key.replace(':', '_') + ".png").toFile());
         } catch (NotFoundException e) {
-            System.out.println("QR not found");
+            //System.out.println("QR not found");
+            ImageIO.write(saveImage(ls), "png", Paths.get(key.replace(':', '_') + "_empty.png").toFile());
         } catch (ChecksumException | FormatException e) {
             e.printStackTrace();
         }
@@ -141,7 +137,7 @@ public class MainPdf {
     }
 
     public static void main(String... args) throws IOException {
-        if(args.length < 1) {
+        if (args.length < 1) {
             System.out.println("Input pdf file required");
             System.exit(1);
         }
@@ -155,23 +151,28 @@ public class MainPdf {
         final StringBuilder builder = new StringBuilder();
         jqpdf.pdfToJson(bytes, (data) -> {
             final String s = new String(data, StandardCharsets.US_ASCII);
+            System.out.println(s);
             builder.append(s);
         });
 
-        ObjectMapper mapper = new ObjectMapper();
+        final ObjectMapper mapper = new ObjectMapper();
         final QPdfJson2 json = mapper.readValue(builder.toString(), QPdfJson2.class);
 
         for (QPdfObject obj : json.qpdf()) {
             if (obj instanceof QPdfObjects all) {
                 for (Map.Entry<String, PdfObject> entry : all.entrySet()) {
-                    final PdfStream stream = entry.getValue().stream();
-                    if (stream != null) {
-                        if ("/XObject".equals(stream.type()) && "/Image".equals(stream.subtype())) {
-                            process(stream);
-                        }
-                    }
+                    Optional.ofNullable(entry.getValue().stream())
+                            .filter(s -> PdfStream.Subtype.IMAGE.equals(s.subtype()))
+                            .ifPresent(s -> {
+                                try {
+                                    process(entry.getKey(), s);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
                 }
             }
         }
+
     }
 }

@@ -48,6 +48,5 @@ JNIEXPORT jint JNICALL Java_ru_vzotov_jqpdf_JQPDF_pdfToJson(JNIEnv *env, jobject
         exit(2);
     }
 
-    std::cout << "Hello world!";
     return 0;
 }
