@@ -6,10 +6,10 @@ plugins {
     id 'maven-publish'
 }
 
-group = 'ru.vzotov'
-version = '11.4.0'
-
 def os = OperatingSystem.current()
+
+group = 'ru.vzotov'
+version = "11.4.0.${os.familyName}"
 
 def jvmHome = Jvm.current().javaHome
 
@@ -25,6 +25,11 @@ tasks.withType(CppCompile).configureEach {
 }
 
 library {
+    targetMachines = [
+            machines.linux.x86_64,
+            machines.windows.x86_64
+    ]
+
     linkage = [Linkage.STATIC, Linkage.SHARED]
 
     binaries.configureEach {
@@ -44,16 +49,34 @@ library {
         }
         //compileTask.dependsOn(downloadAndUnzipQPDF)
     }
+
+    dependencies {
+        api project(':qpdf')
+    }
 }
 
-dependencies {
-    implementation project(':qpdf')
+tasks.withType(LinkSharedLibrary).configureEach{
+    if (os.linux) {
+        linkerArgs.add('-lz')
+        linkerArgs.add('-ljpeg')
+        linkerArgs.add('-lssl')
+        linkerArgs.add('-lcrypto')
+        linkerArgs.add('-lgnutls')
+    }
 }
 
 publishing {
     repositories {
         maven {
             url "../repo"
+        }
+
+        maven {
+            credentials {
+                username "$mavenRepoUser"
+                password "$mavenRepoPassword"
+            }
+            url "https://maven.vzotov.ru/repository/maven-everyone"
         }
     }
 }

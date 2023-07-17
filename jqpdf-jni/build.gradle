@@ -1,4 +1,5 @@
 buildscript {
+    def os = org.gradle.internal.os.OperatingSystem.current()
     def nativeRuntimeUsage = Attribute.of("org.gradle.usage", Usage)
     def nativeOptimized = Attribute.of("org.gradle.native.optimized", Boolean)
 
@@ -15,7 +16,9 @@ buildscript {
         }
     }
     dependencies {
-        natives 'ru.vzotov:jqpdflib_release_shared:11.4.0'
+        natives("ru.vzotov:jqpdflib_release_shared_${os.familyName}:11.4.0.${os.familyName}") {
+            transitive os.windows
+        }
     }
 }
 
@@ -34,12 +37,10 @@ application {
         doFirst {
             workingDir = layout.buildDirectory.dir('natives').get().asFile
 
+            /*
+            Copy shared libraries into working directory
+             */
             buildscript.configurations.natives.resolvedConfiguration.resolvedArtifacts.each { artifact ->
-                println '{'
-                println 'name='+artifact.name
-                println 'path='+artifact.file.getAbsolutePath()
-                println 'filename='+artifact.file.name
-                println '}'
                 copy {
                     from artifact.file
                     into workingDir
@@ -48,18 +49,6 @@ application {
                     }
                 }
             }
-            //buildscript.configurations.natives.collect { println it }
-
-            /*
-            Copy shared libraries into working directory
-             */
-            /*
-            copy {
-                from buildscript.configurations.natives
-                into workingDir
-            }
-
-             */
 
             applicationDefaultJvmArgs = ["-Djava.library.path=" + workingDir.absolutePath]
         }

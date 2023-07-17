@@ -6,10 +6,10 @@ plugins {
     id "de.undercouch.download" version "5.4.0"
 }
 
-group = "qpdf"
-version = "11.4.0"
-
 def os = OperatingSystem.current()
+
+group = "qpdf"
+version = "11.4.0.${os.familyName}"
 
 task downloadLibsZip(type: Download) {
     src "https://github.com/qpdf/external-libs/releases/download/release-2023-07-09/qpdf-external-libs-bin.zip"
@@ -40,8 +40,8 @@ cmake {
         binary = "libqpdf/libqpdf.a"
         runtimeBinary = "libqpdf/libqpdf.so"
         // arguments.addAll('-G', 'Unix Makefiles')
-        arguments.add('-DREQUIRE_CRYPTO_OPENSSL=1')
-        arguments.add('-DREQUIRE_CRYPTO_GNUTLS=1')
+//        arguments.add('-DREQUIRE_CRYPTO_OPENSSL=1')
+//        arguments.add('-DREQUIRE_CRYPTO_GNUTLS=1')
         arguments.add('-DCMAKE_CXX_FLAGS=-fPIC')
     } else {
         throw new GradleException('Unsupported OS')
@@ -57,7 +57,6 @@ cmake {
     }
 
 
-
 //    assembleDebug {
 //        binary = "libqpdf/Debug/qpdf.lib"
 //    }
@@ -68,13 +67,12 @@ cmake {
 }
 
 
-
 publishing {
     repositories {
         maven {
             url "../repo"
         }
-        
+
         maven {
             credentials {
                 username "$mavenRepoUser"
