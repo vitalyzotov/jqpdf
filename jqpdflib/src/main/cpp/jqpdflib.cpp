@@ -2,7 +2,7 @@
 #include <cstring>
 #include <iostream>
 
-#include <jqpdflib.hh>
+#include <jqpdflib.h>
 #include <qpdf/QPDF.hh>
 #include <qpdf/QUtil.hh>
 #include <qpdf/Pl_Buffer.hh>

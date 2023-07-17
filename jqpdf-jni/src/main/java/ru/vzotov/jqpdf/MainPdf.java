@@ -149,8 +149,10 @@ public class MainPdf {
 
         final String inputFile = args[0];
 
+        System.out.println("Java Library path = " + System.getProperty("java.library.path"));
+
         final JQPDF jqpdf = new JQPDF();
-        final byte[] bytes = Files.readAllBytes(Path.of(args[0]));
+        final byte[] bytes = Files.readAllBytes(Path.of(inputFile));
         final StringBuilder builder = new StringBuilder();
         jqpdf.pdfToJson(bytes, (data) -> {
             final String s = new String(data, StandardCharsets.US_ASCII);

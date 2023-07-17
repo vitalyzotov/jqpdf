@@ -1,3 +1,86 @@
+import org.gradle.internal.os.OperatingSystem
+
 plugins {
-    id("io.github.tomtzook.gradle-cmake") version "1.2.2"
+    id 'ru.vzotov.gradle.cmake-library' version '1.0'
+    id 'ru.vzotov.gradle.custom-publication' version '1.0'
+    id "de.undercouch.download" version "5.4.0"
+}
+
+group = "qpdf"
+version = "11.4.0"
+
+def os = OperatingSystem.current()
+
+task downloadLibsZip(type: Download) {
+    src "https://github.com/qpdf/external-libs/releases/download/release-2023-07-09/qpdf-external-libs-bin.zip"
+    dest file("external-libs.zip")
+    onlyIf { !dest.exists() }
+}
+
+task downloadAndUnzipLibs(dependsOn: downloadLibsZip, type: Copy) {
+    from zipTree(downloadLibsZip.dest)
+    into layout.projectDirectory.dir('src')
+    onlyIf { os.isWindows() && !file('src/external-libs').exists() }
+}
+
+cmake {
+    projectDirectory = layout.projectDirectory.dir("src")
+
+    arguments.add('-DCI_MODE=1')
+
+    buildArguments.addAll('--target', 'libqpdf', 'libqpdf_static')
+    buildArguments.add('--verbose')
+
+    if (os.isWindows()) {
+        binary = "libqpdf/Release/qpdf.lib"
+        runtimeBinary = "libqpdf/Release/qpdf29.dll"
+        // arguments.addAll('-G', 'NMake Makefiles')
+        buildArguments.addAll('--config', 'Release')
+    } else if (os.isLinux()) {
+        binary = "libqpdf/libqpdf.a"
+        runtimeBinary = "libqpdf/libqpdf.so"
+        // arguments.addAll('-G', 'Unix Makefiles')
+        arguments.add('-DREQUIRE_CRYPTO_OPENSSL=1')
+        arguments.add('-DREQUIRE_CRYPTO_GNUTLS=1')
+        arguments.add('-DCMAKE_CXX_FLAGS=-fPIC')
+    } else {
+        throw new GradleException('Unsupported OS')
+    }
+
+    cmakeDebug {
+        dependsOn(downloadAndUnzipLibs)
+    }
+
+    cmakeRelease {
+        buildType = 'Release'
+        dependsOn(downloadAndUnzipLibs)
+    }
+
+
+
+//    assembleDebug {
+//        binary = "libqpdf/Debug/qpdf.lib"
+//    }
+//
+//    assembleRelease {
+//        binary = "libqpdf/Release/qpdf.lib"
+//    }
+}
+
+
+
+publishing {
+    repositories {
+        maven {
+            url "../repo"
+        }
+        
+        maven {
+            credentials {
+                username "$mavenRepoUser"
+                password "$mavenRepoPassword"
+            }
+            url "https://maven.vzotov.ru/repository/maven-everyone"
+        }
+    }
 }

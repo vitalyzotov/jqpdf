@@ -1,3 +1,24 @@
+buildscript {
+    def nativeRuntimeUsage = Attribute.of("org.gradle.usage", Usage)
+    def nativeOptimized = Attribute.of("org.gradle.native.optimized", Boolean)
+
+    configurations.create('natives', {
+        attributes {
+            attribute(nativeRuntimeUsage, project.objects.named(Usage, 'native-runtime'))
+            attribute(nativeOptimized, true)
+        }
+    })
+
+    repositories {
+        maven {
+            url "../repo"
+        }
+    }
+    dependencies {
+        natives 'ru.vzotov:jqpdflib_release_shared:11.4.0'
+    }
+}
+
 plugins {
     id 'java'
     id 'application'
@@ -9,7 +30,40 @@ version '1.0-SNAPSHOT'
 mainClassName = 'ru.vzotov.jqpdf.MainPdf'
 
 application {
-    applicationDefaultJvmArgs = ["-Djava.library.path=" + project(':jqpdflib').buildDir.absolutePath +  "/lib/main/debug/shared"]
+    run {
+        doFirst {
+            workingDir = layout.buildDirectory.dir('natives').get().asFile
+
+            buildscript.configurations.natives.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+                println '{'
+                println 'name='+artifact.name
+                println 'path='+artifact.file.getAbsolutePath()
+                println 'filename='+artifact.file.name
+                println '}'
+                copy {
+                    from artifact.file
+                    into workingDir
+                    rename { filename ->
+                        return artifact.file.name
+                    }
+                }
+            }
+            //buildscript.configurations.natives.collect { println it }
+
+            /*
+            Copy shared libraries into working directory
+             */
+            /*
+            copy {
+                from buildscript.configurations.natives
+                into workingDir
+            }
+
+             */
+
+            applicationDefaultJvmArgs = ["-Djava.library.path=" + workingDir.absolutePath]
+        }
+    }
 }
 
 
