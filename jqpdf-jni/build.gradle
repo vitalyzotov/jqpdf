@@ -24,10 +24,11 @@ buildscript {
 
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
 group 'ru.vzotov'
-version '1.0-SNAPSHOT'
+version '1.0'
 
 sourceSets {
     examples {
@@ -90,4 +91,16 @@ tasks.register('readQrCodeFromPdf', JavaExec) {
         }
     }
 
+}
+
+publishing {
+    repositories {
+        maven {
+            credentials {
+                username "$mavenRepoUser"
+                password "$mavenRepoPassword"
+            }
+            url "https://maven.vzotov.ru/repository/maven-everyone"
+        }
+    }
 }
