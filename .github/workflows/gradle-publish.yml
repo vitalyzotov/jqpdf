@@ -1,0 +1,62 @@
+name: Gradle Package
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  Linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Install packages
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install build-essential cmake zlib1g-dev libjpeg-dev libgnutls28-dev libssl-dev libtiff-tools ghostscript pkg-config
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    - name: Build with Gradle
+      uses: gradle/gradle-build-action@v2
+      with:
+        arguments: build -PmavenRepoUser=${{secrets.MAVEN_REPO_USER}} -PmavenRepoPassword=${{secrets.MAVEN_REPO_PASSWORD}}
+    - name: Publish with Gradle
+      uses: gradle/gradle-build-action@v2
+      with:
+        arguments: publish -PmavenRepoUser=${{secrets.MAVEN_REPO_USER}} -PmavenRepoPassword=${{secrets.MAVEN_REPO_PASSWORD}}
+  Windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        tool: [msvc]
+        wordsize: [64]
+    steps:
+      - name: 'Disable git autocrlf'
+        shell: bash
+        run: git config --global core.autocrlf input
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: build -PmavenRepoUser=${{secrets.MAVEN_REPO_USER}} -PmavenRepoPassword=${{secrets.MAVEN_REPO_PASSWORD}}
+      - name: Publish with Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: publish -PmavenRepoUser=${{secrets.MAVEN_REPO_USER}} -PmavenRepoPassword=${{secrets.MAVEN_REPO_PASSWORD}}
